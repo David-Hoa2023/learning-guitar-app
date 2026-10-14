@@ -1,0 +1,636 @@
+<title>Bachata Basic Trainer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;600&family=Source+Sans+3:wght@400;600&display=swap">
+<style>
+/* Layout: one column. Header, then a player card holding the 8-count counter, the top-down stage, the weight bar and controls, then the count table. */
+:root{
+  --bg:#f3f1ee; --surface:#ffffff; --fg:#1f1b18; --muted:#6b625b; --line:#ddd6cf;
+  --accent:#c2410c; --accent-soft:#fde4d6; --next:#0e7490;
+  --floor:#ebe6df; --floorline:#d6cfc6;
+  --display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
+  --body:"Source Sans 3",ui-sans-serif,system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#151210; --surface:#1f1a17; --fg:#f1ebe5; --muted:#a69a90; --line:#3a322c;
+  --accent:#fb923c; --accent-soft:#3d2414; --next:#22d3ee; --floor:#2a231e; --floorline:#3b322b; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#151210; --surface:#1f1a17; --fg:#f1ebe5; --muted:#a69a90; --line:#3a322c;
+  --accent:#fb923c; --accent-soft:#3d2414; --next:#22d3ee; --floor:#2a231e; --floorline:#3b322b; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.5}
+.wrap{max-width:760px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px;display:flex;flex-direction:column;gap:18px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px 24px}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(26px,5vw,38px);line-height:1.05;margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin:4px 0 0}
+.facts{display:flex;gap:8px;flex-wrap:wrap}
+.fact{font-family:var(--mono);font-size:12px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;color:var(--muted);font-variant-numeric:tabular-nums}
+.fact b{color:var(--fg);font-weight:600}
+.stage{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:12px}
+.counter{display:flex;flex-direction:column;gap:6px}
+.crow{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.cell{display:flex;align-items:center;justify-content:center;height:46px;border:1px solid var(--line);border-radius:10px;font-family:var(--display);font-weight:700;font-size:20px;color:var(--muted);background:var(--bg);position:relative}
+.cell.tap{font-size:15px;letter-spacing:.08em}
+.cell small{position:absolute;top:2px;left:6px;font-family:var(--mono);font-size:9px;font-weight:400;color:var(--muted)}
+.cell.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.cell.on small{color:#fff}
+.cell.next:not(.on){border-color:var(--next);border-width:2px;color:var(--fg)}
+.cell.hit{animation:hit .28s ease-out}
+.cell.tap.hit{animation:hitbig .38s ease-out}
+@keyframes hit{from{transform:scale(1.08)}to{transform:scale(1)}}
+@keyframes hitbig{from{transform:scale(1.22)}to{transform:scale(1)}}
+.say{min-height:3.2em}
+.say b{font-family:var(--display);font-size:19px}
+.say span{display:block;color:var(--muted);font-size:14px}
+.floor{display:flex;justify-content:center}
+canvas{display:block;width:100%;border-radius:10px}
+.hip{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.hip .track{position:relative;flex:1;height:10px;border-radius:999px;background:var(--bg);border:1px solid var(--line)}
+.hip .mk{position:absolute;top:50%;left:0;width:20px;height:20px;margin:-10px 0 0 -10px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 0 var(--accent-soft)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.dot{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:-2px;margin-right:5px;box-sizing:border-box}
+.transport{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+button,select{font:inherit;font-size:14px;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:10px;padding:8px 12px;cursor:pointer}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#play{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;min-width:96px}
+.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.opts label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted);min-width:0}
+.opts select{width:100%}
+.chk{display:flex;gap:14px;flex-wrap:wrap;font-size:14px;color:var(--muted)}
+.chk label{display:flex;align-items:center;gap:6px}
+.music{display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:12px}
+.music label.f{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+.panel[hidden]{display:none}
+.panel{display:flex;flex-direction:column;gap:8px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row input[type=number],.row input[type=url],.row input[type=text]{font:inherit;font-size:14px;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:10px;padding:7px 10px;min-width:0}
+.row input[type=number]{width:84px}
+.row input.grow{flex:1 1 160px}
+.row input[type=range]{flex:1 1 160px;min-width:0;accent-color:var(--accent)}
+.fine{font-size:13px;color:var(--muted)}
+.filebtn{position:relative;display:inline-block;border:1px solid var(--line);border-radius:10px;padding:8px 12px;cursor:pointer;background:var(--surface);font-size:14px}
+.filebtn input{position:absolute;width:1px;height:1px;opacity:0}
+.filebtn:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+a.btnlink{color:var(--accent);font-size:14px}
+.songs{display:flex;flex-direction:column;gap:6px}
+.song{display:flex;align-items:center;gap:10px;text-align:left;width:100%}
+.song .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.song .k{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.song.on{border-color:var(--accent);background:var(--accent-soft)}
+#ytwrap{position:relative;width:100%;max-width:480px;aspect-ratio:16/9;background:#000;border-radius:10px;overflow:hidden}
+#ytwrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+#ytwrap[hidden]{display:none}
+h2{font-family:var(--display);font-size:18px;margin:6px 0 0}
+.how{color:var(--muted);max-width:68ch;margin:0}
+.tblwrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:360px}
+th,td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--line)}
+th{font-family:var(--mono);font-size:11px;font-weight:400;color:var(--muted);letter-spacing:.05em;text-transform:uppercase}
+tr:last-child td{border-bottom:0}
+td:first-child{font-family:var(--display);font-weight:700;width:3.5em}
+tr.on td{background:var(--accent-soft)}
+tr.half td{border-top:2px solid var(--line)}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+<div class="wrap">
+<header>
+  <div>
+    <h1>Bachata Basic Trainer</h1>
+    <p class="sub">Both feet stay put. Watch which foot acts, when it lands and where your weight is. Eight counts, two taps, no camera needed.</p>
+  </div>
+  <div class="facts">
+    <span class="fact">tempo <b id="effbpm">82</b> BPM</span>
+    <span class="fact">role <b id="rolef">leader</b></span>
+    <span class="fact">8 counts</span>
+  </div>
+</header>
+
+<section class="stage" aria-label="Dance player">
+  <div class="counter" id="counter" aria-label="Beat counter"></div>
+  <div class="say" id="say" aria-live="polite"></div>
+  <div class="floor"><canvas id="cv" aria-label="Top-down view of both feet on the dance floor"></canvas></div>
+  <div class="hip" aria-label="Weight and hips">
+    <span>L</span><div class="track"><div class="mk" id="mk"></div></div><span>R</span>
+    <span id="hiptxt" style="min-width:11ch">weight: both</span>
+  </div>
+  <div class="legend">
+    <span><i class="dot" style="background:var(--accent)"></i>solid: full weight</span>
+    <span><i class="dot" style="border:2px solid var(--accent)"></i>hollow: no weight</span>
+    <span><i class="dot" style="border:2px dashed var(--next)"></i>dashed ring: the foot that moves next, with its count</span>
+    <span>number inside: the count that foot last stepped on</span>
+  </div>
+  <div class="music">
+    <label class="f" for="src">Music
+      <select id="src"><option value="synth">Built-in click and shaker</option><option value="file">My audio file</option><option value="link">YouTube or Spotify link</option></select></label>
+    <div class="panel" id="p-file" hidden>
+      <div class="row"><label class="filebtn" for="file">Add an audio file<input id="file" type="file" accept="audio/*"></label></div>
+      <div class="fine" id="fstat">Choose a song from your device. It stays on your device and is not uploaded anywhere. The page finds the tempo for you.</div>
+      <div class="row"><label for="fbpm" class="fine">Song BPM</label><input id="fbpm" type="number" min="40" max="240" step="0.1" value="110"><button type="button" id="half">÷2</button><button type="button" id="dbl">×2</button></div>
+      <div class="row"><input id="pos" type="range" min="0" max="1" step="0.01" value="0" aria-label="Song position"><span class="fine" id="ptime">0:00</span></div>
+    </div>
+    <div class="panel" id="p-link" hidden>
+      <div class="row"><input id="url" class="grow" type="url" placeholder="Paste a YouTube or Spotify link" aria-label="Song link"><input id="lname" class="grow" type="text" placeholder="Name (optional)" aria-label="Song name"><button type="button" id="useLink">Add link</button></div>
+      <div class="fine" id="lstat">Paste a YouTube link and the video plays right here. Spotify links cannot play here, so they use tap-along mode: play the song in Spotify, then press "Count 1 now" on its first beat.</div>
+      <div id="ytwrap" hidden></div>
+      <div class="row"><a id="openLink" class="btnlink" target="_blank" rel="noopener noreferrer" hidden>Open this song in a new tab</a></div>
+      <div class="row"><label for="lbpm" class="fine">Song BPM</label><input id="lbpm" type="number" min="40" max="240" step="0.1" value="110"><button type="button" id="lhalf">÷2</button><button type="button" id="ldbl">×2</button></div>
+      <div class="row"><button type="button" id="tapt">Tap tempo</button><span class="fine" id="tapn"></span><button type="button" id="mic">Listen to find tempo</button></div>
+      <div class="fine" id="micstat">"Listen" uses your microphone for 15 seconds while the song plays out loud from the speakers (headphones will not work). Or tap along with the beat. If the other player runs at 0.75x, pick the same speed below.</div>
+    </div>
+    <div class="panel" id="align" hidden>
+      <div class="row"><button type="button" id="tap1">This is count 1</button><button type="button" id="shift">Shift 1 beat</button><button type="button" id="nm">−30 ms</button><button type="button" id="np">+30 ms</button></div>
+      <div class="fine">While the song plays, press "This is count 1" on a strong first beat (the bass or bongo accent). Use shift and nudge if the feet feel early or late.</div>
+    </div>
+  </div>
+  <div class="transport">
+    <button id="play" type="button">Play</button>
+    <span class="fact">counts <b id="secf">1 to 8</b></span>
+  </div>
+  <div class="opts">
+    <label for="mode">Move<select id="mode"><option value="side">Side-to-side basic</option><option value="fb">Forward and back basic</option></select></label>
+    <label for="role">Role<select id="role"><option value="lead">Leader</option><option value="follow">Follower (mirror)</option></select></label>
+    <label for="section">Practice<select id="section"><option value="all">All 8 counts</option><option value="a">Counts 1 to 4</option><option value="b">Counts 5 to 8</option></select></label>
+    <label for="bpm">Song tempo<select id="bpm"><option value="82" selected>82 BPM (training)</option><option value="100">100 BPM</option><option value="123">123 BPM (your clip)</option></select></label>
+    <label for="speed">Speed<select id="speed"><option value="0.5">50%</option><option value="0.75">75%</option><option value="1" selected>100%</option></select></label>
+  </div>
+  <div class="chk">
+    <label for="click"><input id="click" type="checkbox" checked> Count clicks</label>
+    <label for="perc"><input id="perc" type="checkbox" checked> Off-beat shaker</label>
+  </div>
+</section>
+
+<section>
+  <h2>Counts at a glance</h2>
+  <p class="how" style="margin-bottom:8px" id="tblnote"></p>
+  <div class="tblwrap"><table><thead><tr><th>Count</th><th>Foot</th><th>What happens</th><th>Weight</th></tr></thead><tbody id="tbody"></tbody></table></div>
+</section>
+
+<section>
+  <h2>My songs</h2>
+  <p class="how" style="margin-bottom:8px" id="songsnote">Songs you add show up here. Links are remembered on this device. Audio files last until you close the page.</p>
+  <div class="songs" id="songs"></div>
+</section>
+
+<section>
+  <h2>What this demo leaves out</h2>
+  <p class="how">The feet do not travel across the floor, so direction is shown by the arrow in the text. Hip and body movement is reduced to the weight bar and a pop on the taps. There is no partner, no turns and no live feedback yet. The footwork is the standard basic from general knowledge, so have a dance teacher check the taps before lessons are built on it. With the built-in sound it is a synthesized click and shaker, not a real song. YouTube plays through its official embedded player, so the page never touches the video's audio. Tempo comes from your microphone or from tapping. Spotify links still cannot play here.</p>
+</section>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const cv=$('cv'), cx=cv.getContext('2d');
+const S={mode:'side',role:'lead',section:'all',bpm:82,speed:1,click:true,perc:true,src:'synth',songBpm:110,offset:0,linkBpm:110};
+let audioEl=null,curSong=null;
+const yt={player:null,on:false,playing:false};
+const usesMedia=()=>S.src==='file'||(S.src==='link'&&yt.on);
+const mediaBeat=()=>60/(S.src==='file'?S.songBpm:S.linkBpm);
+const SEQ={all:[1,2,3,4,5,6,7,8],a:[1,2,3,4],b:[5,6,7,8]};
+const BASEIDX={all:0,a:0,b:4};
+let C={};
+function readColors(){const s=getComputedStyle(document.documentElement),g=n=>s.getPropertyValue(n).trim();
+  C={fg:g('--fg'),muted:g('--muted'),line:g('--line'),accent:g('--accent'),next:g('--next'),surface:g('--surface'),floor:g('--floor'),fl:g('--floorline'),mono:g('--mono')||'monospace',disp:g('--display')||'sans-serif'}}
+
+// ---------- footwork data (leader, own-body view; x: right is +, y: forward is +)
+let poses=[], info=[], view={};
+const swap=f=>f==='L'?'R':'L';
+const swapDir={left:'right',right:'left',forward:'back',back:'forward',close:'close',beside:'beside'};
+function build(){
+  const side=S.mode==='side', z=Array(9).fill(0);
+  const Lx=side?[-.25,-1.25,-1.25,-2.25,-2.25,-2.25,-1.25,-1.25,-.25]:Array(9).fill(-.25);
+  const Rx=side?[.25,.25,-.75,-.75,-1.75,-.75,-.75,.25,.25]:Array(9).fill(.25);
+  const Ly=side?z:[0,1,1,2,2,2,1,1,0];
+  const Ry=side?z:[0,0,1,1,2,1,1,0,0];
+  let W=['R','L','R','L','L','R','L','R','R'];
+  let foot=[null,'L','R','L','R','R','L','R','L'];
+  const act=[null,'step','close','step','tap','step','close','step','tap'];
+  let dir=side?[null,'left','close','left','beside','right','close','right','beside']
+               :[null,'forward','close','forward','beside','back','close','back','beside'];
+  poses=[];
+  const fol=S.role==='follow';
+  for(let k=0;k<9;k++){
+    poses.push(fol?{L:{x:-Rx[k],y:-Ry[k]},R:{x:-Lx[k],y:-Ly[k]},w:swap(W[k])}
+                  :{L:{x:Lx[k],y:Ly[k]},R:{x:Rx[k],y:Ry[k]},w:W[k]});
+  }
+  if(fol){foot=foot.map(f=>f&&swap(f));dir=dir.map(d=>d&&swapDir[d])}
+  poses.forEach(p=>{p.L={x:-0.4,y:0};p.R={x:0.4,y:0}}); // feet stay put; only weight and counts change
+  info=[null];
+  for(let k=1;k<=8;k++){
+    const f=foot[k],o=swap(f),a=act[k],d=dir[k],w=poses[k].w;
+    let what,desc;
+    if(a==='step'){what='Step '+d;desc='Step '+d+' with '+f}
+    else if(a==='close'){what='Close '+f+' to '+o;desc='Close '+f+' to '+o}
+    else{what='Tap '+f+' beside '+o+', hip pop';desc='Tap '+f+' beside '+o+', hip pop. Weight stays on '+o}
+    info.push({foot:f,act:a,what,desc,w,tap:a==='tap',arrow:({left:'← ',right:'→ ',forward:'↑ ',back:'↓ '})[d]||''});
+  }
+  view={x0:-1.45,x1:1.45,y0:-0.95,y1:0.95};
+  view.aspect=(view.x1-view.x0)/(view.y1-view.y0);
+  cv.style.aspectRatio=view.aspect;
+  cv.style.maxWidth='380px';
+  buildTable(); sizeCanvas();
+}
+function buildTable(){
+  const tb=$('tbody'); tb.innerHTML='';
+  for(let k=1;k<=8;k++){
+    const i=info[k], tr=document.createElement('tr'); tr.id='tr'+k; if(k===5)tr.className='half';
+    tr.innerHTML='<td>'+(i.tap?'TAP':k)+'</td><td>'+i.foot+'</td><td>'+i.desc.replace(/^./,c=>c.toUpperCase())+'</td><td>'+i.w+'</td>';
+    tb.appendChild(tr);
+  }
+  $('tblnote').textContent='Counts 1 to 4 go one way and counts 5 to 8 come back. Taps on 4 and 8 keep your weight on the other foot. Row for the current count lights up while you play.';
+  $('rolef').textContent=S.role==='lead'?'leader':'follower';
+}
+
+// ---------- counter
+const cells={};
+(function(){const c=$('counter');
+  [[1,2,3,4],[5,6,7,8]].forEach(row=>{const r=document.createElement('div');r.className='crow';
+    row.forEach(n=>{const d=document.createElement('div');d.className='cell'+(n%4===0?' tap':'');
+      d.innerHTML='<small>'+n+'</small>'+(n%4===0?'TAP':n);cells[n]=d;r.appendChild(d)});c.appendChild(r)});})();
+let litShown=-1,nextShown=-1;
+function setCounter(lit,next){
+  if(lit!==litShown){
+    for(let n=1;n<=8;n++)cells[n].classList.toggle('on',n===lit);
+    if(lit>0){const c=cells[lit];c.classList.remove('hit');void c.offsetWidth;c.classList.add('hit')}
+    for(let n=1;n<=8;n++){const t=$('tr'+n);if(t)t.classList.toggle('on',n===lit)}
+    litShown=lit;
+    const say=$('say');
+    if(lit>0){say.innerHTML='<b>'+(info[lit].tap?'TAP':lit)+' · '+info[lit].arrow+cap(info[lit].desc)+'</b><span>Next: '+info[next].arrow+cap(info[next].desc)+'</span>'}
+    else{say.innerHTML='<b>Press Play to start on count '+SEQ[S.section][0]+'</b><span>First move: '+cap(info[SEQ[S.section][0]].desc)+'</span>'}
+  }
+  if(next!==nextShown){for(let n=1;n<=8;n++)cells[n].classList.toggle('next',n===next);nextShown=next}
+}
+const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
+
+// ---------- canvas
+let W=0,H=0,U=1,dpr=1;
+function sizeCanvas(){const r=cv.getBoundingClientRect();dpr=window.devicePixelRatio||1;W=r.width;H=r.height;cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);U=W/(view.x1-view.x0)}
+const sx=x=>(x-view.x0)*U, sy=y=>(view.y1-y)*U;
+function footPath(x,y,side,k){
+  k=k||1;const m=side==='L'?1:-1,kx=0.32*U*k,ky=0.4*U*k,px=sx(x),py=sy(y);
+  const P=(a,b)=>[px+m*a*kx,py+b*ky];
+  const seg=(c1,c2,e)=>cx.bezierCurveTo(...P(...c1),...P(...c2),...P(...e));
+  cx.beginPath();cx.moveTo(...P(0,1));
+  seg([-0.42,1],[-0.46,0.6],[-0.40,0.2]);          // outer heel up to outer midfoot
+  seg([-0.36,-0.15],[-0.62,-0.35],[-0.55,-0.65]);   // outer ball of the foot
+  seg([-0.50,-0.95],[-0.20,-1.0],[0.0,-1.0]);       // small toes
+  seg([0.18,-1.12],[0.50,-1.05],[0.52,-0.78]);      // big toe on the inside
+  seg([0.60,-0.50],[0.34,-0.20],[0.24,0.10]);       // inner ball into the arch
+  seg([0.14,0.45],[0.40,1],[0,1]);                  // arch to inner heel
+  cx.closePath();
+}
+function drawFoot(p,side,kind,alpha,num,k){
+  cx.save();cx.globalAlpha=alpha==null?1:alpha;footPath(p.x,p.y,side,k);
+  if(kind==='solid'){cx.fillStyle=C.accent;cx.fill();cx.strokeStyle=C.accent;cx.lineWidth=2;cx.lineJoin='round';cx.stroke();cx.fillStyle='#fff'}
+  else if(kind==='hollow'){cx.fillStyle=C.surface;cx.fill();cx.strokeStyle=C.accent;cx.lineWidth=2.5;cx.stroke();cx.fillStyle=C.accent}
+  else if(kind==='tap'){cx.fillStyle=C.surface;cx.fill();cx.strokeStyle=C.accent;cx.lineWidth=2.5;cx.setLineDash([5,4]);cx.stroke();cx.setLineDash([]);cx.fillStyle=C.accent}
+  else if(kind==='ghost'){cx.strokeStyle=C.next;cx.lineWidth=2.5;cx.setLineDash([6,5]);cx.stroke();cx.setLineDash([]);cx.fillStyle=C.next}
+  else if(kind==='home'){cx.strokeStyle=C.muted;cx.globalAlpha=.35;cx.lineWidth=1.2;cx.setLineDash([3,4]);cx.stroke();cx.setLineDash([])}
+  if(num){cx.font='700 '+Math.max(14,Math.min(24,0.3*U))+'px '+C.disp;cx.textAlign='center';cx.textBaseline='middle';cx.fillText(String(num),sx(p.x),sy(p.y)+1)}
+  cx.restore();
+}
+function arrow(a,b){
+  const ax=sx(a.x),ay=sy(a.y),bx=sx(b.x),by=sy(b.y),d=Math.hypot(bx-ax,by-ay);if(d<4)return;
+  const ux=(bx-ax)/d,uy=(by-ay)/d,end=d-0.3*U>0?d-0.3*U:d;
+  cx.save();cx.strokeStyle=C.next;cx.fillStyle=C.next;cx.lineWidth=3;cx.lineCap='round';cx.shadowColor=C.next;cx.shadowBlur=8;
+  cx.beginPath();cx.moveTo(ax,ay);cx.lineTo(ax+ux*end,ay+uy*end);cx.stroke();
+  const hx=ax+ux*end,hy=ay+uy*end;cx.beginPath();cx.moveTo(hx+ux*9,hy+uy*9);cx.lineTo(hx-uy*6,hy+ux*6);cx.lineTo(hx+uy*6,hy-ux*6);cx.closePath();cx.fill();cx.restore();
+}
+function lastCount(f,lit){
+  if(lit<1)return 0;
+  for(let k=lit;k>=1;k--)if(info[k].foot===f)return k;
+  for(let k=8;k>lit;k--)if(info[k].foot===f)return k;
+  return 0;
+}
+const lerp=(a,b,t)=>a+(b-a)*t, ease=t=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t)};
+const mix=(p,q,t)=>({x:lerp(p.x,q.x,t),y:lerp(p.y,q.y,t)});
+
+// ---------- clock + audio
+let ac=null,master=null,playing=false,t0=0,beat=0.73,nextS=0,timer=null;
+const now=()=>ac?ac.currentTime:performance.now()/1000;
+const curBpm=()=>S.src==='file'?S.songBpm:S.src==='link'?S.linkBpm:S.bpm;
+function effBeat(){return 60/(curBpm()*S.speed)}
+function blip(T,c){
+  if(!S.click||!master)return;
+  const o=ac.createOscillator(),g=ac.createGain();
+  const tap=c%4===0,acc=c===1||c===5;
+  o.type=tap?'square':'triangle';o.frequency.value=tap?1500:acc?1100:800;
+  g.gain.setValueAtTime(0.0001,T);g.gain.exponentialRampToValueAtTime(tap?0.22:acc?0.32:0.2,T+0.004);g.gain.exponentialRampToValueAtTime(0.0001,T+(tap?0.07:0.05));
+  o.connect(g).connect(master);o.start(T);o.stop(T+0.1);
+}
+let noiseBuf=null;
+function shaker(T){
+  if(!S.perc||!master)return;
+  if(!noiseBuf){const n=Math.floor(ac.sampleRate*0.06);noiseBuf=ac.createBuffer(1,n,ac.sampleRate);const d=noiseBuf.getChannelData(0);for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*(1-i/n)}
+  const s=ac.createBufferSource(),f=ac.createBiquadFilter(),g=ac.createGain();s.buffer=noiseBuf;f.type='highpass';f.frequency.value=6000;g.gain.value=0.16;
+  s.connect(f).connect(g).connect(master);s.start(T);
+}
+function sched(){
+  const seq=SEQ[S.section],horizon=ac.currentTime+0.18;
+  while(t0+nextS*beat<horizon){const T=t0+nextS*beat;blip(T,seq[nextS%seq.length]);shaker(T+beat/2);nextS++}
+}
+function start(){
+  if(S.src==='link'&&yt.on){try{yt.player.setPlaybackRate(S.speed);yt.player.playVideo()}catch(e){}return}
+  if(S.src==='file'){
+    if(!audioEl){$('fstat').textContent='Add an audio file first.';return}
+    audioEl.playbackRate=S.speed;audioEl.play().catch(()=>{});playing=true;refreshPlay();return;
+  }
+  ac=ac||new (window.AudioContext||window.webkitAudioContext)();ac.resume();
+  master=ac.createGain();master.gain.value=0.9;master.connect(ac.destination);
+  beat=effBeat();t0=ac.currentTime+(S.src==='link'?0.05:0.4);nextS=0;playing=true;refreshPlay();
+  timer=setInterval(sched,30);sched();
+}
+function stop(){
+  clearInterval(timer);playing=false;if(audioEl)audioEl.pause();if(yt.on){try{yt.player.pauseVideo()}catch(e){}}refreshPlay();
+  if(master){try{master.disconnect()}catch(e){}master=null}
+  litShown=-2;
+}
+const restart=()=>{if(playing){stop();start()}};
+
+// ---------- per-frame state
+let hipPos=.5;
+function frame(){
+  const seq=SEQ[S.section],len=seq.length,base=poses[BASEIDX[S.section]];
+  let lit=0,frac=0,nextCount=seq[0],A=base,Lp=base.L,Rp=base.R,wgt=base.w,ghost=null,i=0;
+  if(playing){
+    const u=usesMedia()?(audioNow()-S.offset)/mediaBeat():(now()-t0)/beat;
+    if(u>=0||usesMedia()){
+      const s=Math.floor(u);i=((s%len)+len)%len;lit=seq[i];frac=u-s;
+      const ni=(i+1)%len;nextCount=seq[ni];A=poses[lit];wgt=A.w;
+      const wrap=S.section!=='all'&&ni===0;
+      let from=A,to=poses[nextCount],e;
+      if(wrap){
+        if(frac<0.4){to=base;e=ease(frac/0.4)}
+        else{from=base;e=ease((frac-0.4)/0.6)}
+        const tgt=poses[nextCount];to=frac<0.4?base:tgt;
+      }else e=ease((frac-0.15)/0.85);
+      ghost={f:info[nextCount].foot,p:poses[nextCount][info[nextCount].foot]};
+    } else {ghost={f:info[nextCount].foot,p:poses[nextCount][info[nextCount].foot]}}
+  } else ghost={f:info[nextCount].foot,p:poses[nextCount][info[nextCount].foot]};
+  setCounter(lit,nextCount);
+  // draw
+  cx.setTransform(dpr,0,0,dpr,0,0);cx.clearRect(0,0,W,H);
+  cx.fillStyle=C.floor;cx.fillRect(0,0,W,H);
+  cx.strokeStyle=C.fl;cx.lineWidth=1;
+  for(let gx=Math.ceil(view.x0);gx<=view.x1;gx++){cx.beginPath();cx.moveTo(sx(gx),0);cx.lineTo(sx(gx),H);cx.stroke()}
+  for(let gy=Math.ceil(view.y0);gy<=view.y1;gy++){cx.beginPath();cx.moveTo(0,sy(gy));cx.lineTo(W,sy(gy));cx.stroke()}
+  // which foot is weighted right now
+  const tapNow=lit>0&&info[lit].tap&&frac<1;
+  const moving=ghost.f;
+  const ghostActive=true;
+  // next foot: dashed ring and its upcoming count above it
+  {const nf=ghost.f,p=poses[0][nf];cx.save();footPath(p.x,p.y,nf,1.3);cx.strokeStyle=C.next;cx.lineWidth=3;cx.setLineDash([6,5]);cx.translate(0,0);
+   cx.stroke();cx.setLineDash([]);cx.fillStyle=C.next;cx.font='700 '+Math.max(15,Math.min(26,0.32*U))+'px '+C.disp;cx.textAlign='center';cx.textBaseline='middle';
+   cx.fillText(String(nextCount),sx(p.x),sy(p.y)-0.66*U);cx.restore()}
+  ['L','R'].forEach(f=>{
+    const p=f==='L'?Lp:Rp;
+    let kind=wgt===f?'solid':'hollow';
+    if(lit>0&&info[lit].tap&&info[lit].foot===f)kind='tap';
+    drawFoot(p,f,kind,1,lastCount(f,lit),(lit>0&&info[lit].foot===f&&frac<0.35)?1+0.18*(1-frac/0.35):1);
+  });
+  // weight / hip bar
+  const target=wgt==='L'?0:1;hipPos=lerp(hipPos,target,0.25);
+  const mk=$('mk');mk.style.left=(hipPos*100)+'%';
+  const pop=tapNow&&frac<0.4;
+  mk.style.transform=pop?'scale('+(1.7-frac)+')':'scale(1)';
+  mk.style.boxShadow=pop?'0 0 0 8px var(--accent-soft)':'0 0 0 0 var(--accent-soft)';
+  $('hiptxt').textContent='weight: '+(lit===0?'both':wgt)+(pop?' · pop':'');
+  tickMusic();requestAnimationFrame(frame);
+}
+
+// ---------- controls
+$('play').onclick=()=>playing?stop():start();
+function onChange(){
+  S.mode=$('mode').value;S.role=$('role').value;S.section=$('section').value;S.bpm=+$('bpm').value;S.speed=+$('speed').value;if(audioEl&&playing)audioEl.playbackRate=S.speed;if(yt.on){try{yt.player.setPlaybackRate(S.speed)}catch(e){}}
+  refreshChips();
+  $('secf').textContent=S.section==='all'?'1 to 8':S.section==='a'?'1 to 4':'5 to 8';
+  litShown=-2;nextShown=-2;
+  build();restart();
+}
+['mode','role','section','bpm','speed'].forEach(id=>$(id).onchange=onChange);
+$('click').onchange=e=>S.click=e.target.checked;
+$('perc').onchange=e=>S.perc=e.target.checked;
+new ResizeObserver(()=>sizeCanvas()).observe(cv);
+new MutationObserver(readColors).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',readColors);
+
+// ---------- music sources
+const refreshChips=()=>{$('effbpm').textContent=Math.round(curBpm()*S.speed)};
+function refreshPlay(){$('play').textContent=playing?'Stop':(S.src==='link'&&!yt.on?'Count 1 now':'Play')}
+function refreshAlign(){$('align').hidden=!usesMedia()}
+const fmtT=t=>Math.floor(t/60)+':'+String(Math.floor(t%60)).padStart(2,'0');
+let lastT=0,lastP=0;
+function audioNow(){
+  let t,paused,rate;
+  if(S.src==='link'&&yt.on){try{t=yt.player.getCurrentTime()}catch(e){return 0}paused=!yt.playing;rate=S.speed}
+  else if(audioEl){t=audioEl.currentTime;paused=audioEl.paused;rate=audioEl.playbackRate}
+  else return 0;
+  const p=performance.now();
+  if(t!==lastT){lastT=t;lastP=p}
+  if(paused)return t;
+  return t+Math.min(0.12,(p-lastP)/1000*rate);
+}
+function setSrc(v){
+  stop();S.src=v;if(v!=='link')stopPlayer();
+  $('p-file').hidden=v!=='file';$('p-link').hidden=v!=='link';
+  $('bpm').disabled=v!=='synth';
+  $('click').disabled=v==='file'||(v==='link'&&yt.on);$('perc').disabled=$('click').disabled;
+  litShown=-2;refreshChips();refreshPlay();refreshAlign();
+}
+$('src').onchange=e=>setSrc(e.target.value);
+
+// tempo and first-beat finder (browser-side, runs on your device)
+function analyzeBuffer(buf){
+  const sr=buf.sampleRate,a=buf.getChannelData(0),b=buf.numberOfChannels>1?buf.getChannelData(1):a;
+  const hop=512,total=Math.min(buf.length,Math.floor(sr*100)),n=Math.floor(total/hop);
+  if(n<300)return null;
+  const fps=sr/hop,env=new Float32Array(n);let prev=0;
+  for(let i=0;i<n;i++){let e=0;const o=i*hop;for(let j=0;j<hop;j++){const v=(a[o+j]+b[o+j])*.5;e+=v*v}
+    const l=Math.log1p(80*Math.sqrt(e/hop));env[i]=Math.max(0,l-prev);prev=l}
+  const w=Math.round(fps),cs=new Float64Array(n+1);for(let i=0;i<n;i++)cs[i+1]=cs[i]+env[i];
+  const e2=new Float32Array(n);
+  for(let i=0;i<n;i++){const lo=Math.max(0,i-w),hi=Math.min(n,i+w),m=(cs[hi]-cs[lo])/(hi-lo);e2[i]=Math.max(0,env[i]-m)}
+  const lmin=Math.floor(fps*60/190),lmax=Math.ceil(fps*60/65),r=new Float64Array(lmax+3);
+  for(let L=lmin-1;L<=lmax+1;L++){let sum=0;for(let i=0;i+L<n;i++)sum+=e2[i]*e2[i+L];r[L]=sum/(n-L)}
+  let best=-1,bl=lmin;
+  for(let L=lmin;L<=lmax;L++){const bpm=60*fps/L,prior=Math.exp(-0.5*Math.pow(Math.log2(bpm/115)/0.75,2)),sc=r[L]*prior;
+    if(sc>best&&r[L]>=r[L-1]&&r[L]>=r[L+1]){best=sc;bl=L}}
+  const y0=r[bl-1],y1=r[bl],y2=r[bl+1],den=y0-2*y1+y2,d=den!==0?0.5*(y0-y2)/den:0;
+  const bpm=60*fps/(bl+d);
+  let bs=-1,bB=bpm,bP=0;
+  for(let t=bpm-3;t<=bpm+3;t+=0.1){const per=60*fps/t;
+    for(let p=0;p<per;p+=0.5){let sum=0,c=0;for(let x=p;x<n-1;x+=per){sum+=e2[Math.round(x)];c++}sum/=c;if(sum>bs){bs=sum;bB=t;bP=p}}}
+  while(bB<85)bB*=2;while(bB>160)bB/=2;
+  return {bpm:Math.round(bB*10)/10,offset:bP/fps};
+}
+async function handleFile(f){
+  stop();
+  const st=$('fstat');st.textContent='Reading "'+f.name+'" and finding the tempo...';
+  if(audioEl){try{URL.revokeObjectURL(audioEl.src)}catch(e){}}
+  const url=URL.createObjectURL(f);
+  audioEl=new Audio(url);audioEl.preservesPitch=true;audioEl.webkitPreservesPitch=true;audioEl.mozPreservesPitch=true;
+  audioEl.addEventListener('ended',()=>stop());
+  audioEl.addEventListener('loadedmetadata',()=>{$('pos').max=audioEl.duration||1});
+  audioEl.addEventListener('error',()=>{st.textContent='This browser could not play that file. Try an mp3, m4a or wav.';audioEl=null});
+  let res=null;
+  try{
+    ac=ac||new (window.AudioContext||window.webkitAudioContext)();
+    const buf=await ac.decodeAudioData(await f.arrayBuffer());
+    res=analyzeBuffer(buf);
+  }catch(e){}
+  if(res){S.songBpm=res.bpm;S.offset=res.offset;st.textContent='"'+f.name+'": found about '+res.bpm+' BPM. Press Play, then press "This is count 1" on a strong first beat. If the tempo looks doubled or halved, use ÷2 or ×2.'}
+  else{S.songBpm=110;S.offset=0;st.textContent='"'+f.name+'" loaded, but the tempo could not be found. Type the BPM yourself.'}
+  $('fbpm').value=S.songBpm;
+  curSong=addSong({type:'file',title:f.name.replace(/\.[^.]+$/,''),bpm:S.songBpm,offset:S.offset,audio:audioEl,fstat:st.textContent});
+  refreshChips();
+}
+$('file').onchange=e=>{const f=e.target.files[0];if(f)handleFile(f)};
+$('fbpm').onchange=e=>{S.songBpm=Math.max(40,Math.min(240,+e.target.value||110));e.target.value=S.songBpm;refreshChips()};
+$('half').onclick=()=>{S.songBpm=Math.round(S.songBpm/2*10)/10;$('fbpm').value=S.songBpm;refreshChips()};
+$('dbl').onclick=()=>{S.songBpm=Math.round(S.songBpm*2*10)/10;$('fbpm').value=S.songBpm;refreshChips()};
+$('tap1').onclick=()=>{if(!usesMedia()||!playing)return;S.offset=audioNow()-0.1};
+$('shift').onclick=()=>{S.offset+=mediaBeat()};
+$('nm').onclick=()=>{S.offset-=0.03};
+$('np').onclick=()=>{S.offset+=0.03};
+let seeking=false;
+$('pos').oninput=e=>{if(audioEl)audioEl.currentTime=+e.target.value};
+
+// links
+function parseLink(u){
+  try{
+    const url=new URL(u.trim());if(url.protocol!=='https:')return null;
+    const h=url.hostname.replace(/^www\./,'').replace(/^m\./,'');
+    if(h==='youtu.be'&&url.pathname.length>1)return {site:'YouTube',id:url.pathname.slice(1),href:url.href};
+    if(h==='youtube.com'||h==='music.youtube.com'){
+      const v=url.searchParams.get('v');if(v)return {site:'YouTube',id:v,href:url.href};
+      const m=url.pathname.match(/\/(shorts|embed)\/([\w-]+)/);if(m)return {site:'YouTube',id:m[2],href:url.href};
+    }
+    if(h==='open.spotify.com'){const m=url.pathname.match(/\/(track|episode|album|playlist)\/(\w+)/);if(m)return {site:'Spotify',id:m[2],kind:m[1],href:url.href}}
+  }catch(e){}
+  return null;
+}
+function selectLink(song){
+  S.linkBpm=song.bpm;$('lbpm').value=song.bpm;
+  const a=$('openLink');a.href=song.href;a.hidden=false;
+  $('lstat').textContent=song.site==='YouTube'?'Loading the YouTube player...':song.site+' link added'+(song.title?' as "'+song.title+'"':'')+'. Spotify cannot play inside this page. Open it in a new tab, set the BPM, press play there, then press "Count 1 now" on its first beat.';
+  if(song.site==='YouTube')startPlayer(song.id);else stopPlayer();
+  refreshChips();
+}
+$('useLink').onclick=()=>{
+  const p=parseLink($('url').value);
+  if(!p){$('lstat').textContent='That does not look like a Spotify or YouTube link. Paste the full https address of a song or video.';$('openLink').hidden=true;return}
+  const nm=$('lname').value.trim().slice(0,60)||(p.site+' '+(p.kind||'video')+' '+p.id.slice(0,6));
+  curSong=addSong({type:'link',title:nm,bpm:S.linkBpm,site:p.site,id:p.id,href:p.href});
+  selectLink(curSong);$('url').value='';$('lname').value='';
+};
+$('lbpm').onchange=e=>{S.linkBpm=Math.max(40,Math.min(240,+e.target.value||110));e.target.value=S.linkBpm;if(curSong&&curSong.type==='link'){curSong.bpm=S.linkBpm;saveSongs();renderSongs()}refreshChips()};
+let taps=[];
+$('tapt').onclick=()=>{
+  const media=yt.on&&S.src==='link';
+  const t=media?audioNow():performance.now()/1000;
+  if(taps.length&&Math.abs(t-taps[taps.length-1])>2)taps=[];
+  taps.push(t);taps=taps.slice(-9);
+  if(taps.length>=3){
+    const iv=[];for(let i=1;i<taps.length;i++)iv.push(taps[i]-taps[i-1]);iv.sort((x,y)=>x-y);
+    let bpm=60/iv[Math.floor(iv.length/2)];while(bpm<70)bpm*=2;while(bpm>180)bpm/=2;
+    S.linkBpm=Math.round(bpm*10)/10;$('lbpm').value=S.linkBpm;
+    if(media)S.offset=t; // beat phase follows your last tap
+    if(curSong&&curSong.type==='link'){curSong.bpm=S.linkBpm;saveSongs();renderSongs()}refreshChips();
+  }
+  $('tapn').textContent=taps.length<3?'keep tapping the beat':taps.length+' taps';
+};
+$('lhalf').onclick=()=>{S.linkBpm=Math.round(S.linkBpm/2*10)/10;$('lbpm').value=S.linkBpm;refreshChips()};
+$('ldbl').onclick=()=>{S.linkBpm=Math.round(S.linkBpm*2*10)/10;$('lbpm').value=S.linkBpm;refreshChips()};
+
+// microphone tempo: listens to the song through the speakers, never to the video itself
+$('mic').onclick=async()=>{
+  const st=$('micstat'),btn=$('mic');
+  if(!navigator.mediaDevices||!window.MediaRecorder){st.textContent='This browser cannot record from the microphone.';return}
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+    btn.disabled=true;
+    const rec=new MediaRecorder(stream),chunks=[];rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+    let left=15;const show=()=>{st.textContent='Listening... keep the song playing out loud ('+left+' s)'};show();
+    const iv=setInterval(()=>{left--;if(left>0)show()},1000);
+    rec.onstop=async()=>{
+      clearInterval(iv);stream.getTracks().forEach(x=>x.stop());btn.disabled=false;
+      st.textContent='Working out the tempo...';
+      try{
+        ac=ac||new (window.AudioContext||window.webkitAudioContext)();
+        const buf=await ac.decodeAudioData(await new Blob(chunks).arrayBuffer());
+        const res=analyzeBuffer(buf);
+        if(!res)throw new Error('short');
+        let bpm=Math.round(res.bpm/S.speed*10)/10;
+        S.linkBpm=bpm;$('lbpm').value=bpm;
+        if(curSong&&curSong.type==='link'){curSong.bpm=bpm;saveSongs();renderSongs()}
+        refreshChips();
+        st.textContent='Heard about '+bpm+' BPM. If it looks doubled or halved, use ÷2 or ×2. Then press "This is count 1" on a strong first beat while it plays.';
+      }catch(e){st.textContent='Could not work out a tempo. Play the song louder or closer to the microphone, or tap the beat instead.'}
+    };
+    rec.start();setTimeout(()=>{if(rec.state!=='inactive')rec.stop()},15000);
+  }catch(e){st.textContent='The microphone was blocked. Allow it for this page, or tap the beat instead.'}
+};
+
+// YouTube player (official embed; the page never reads the video's audio)
+function loadYT(cb){
+  if(window.YT&&YT.Player){cb();return}
+  window.onYouTubeIframeAPIReady=cb;
+  if(!document.getElementById('yt-api')){const sc=document.createElement('script');sc.id='yt-api';sc.src='https://www.youtube.com/iframe_api';sc.onerror=()=>{$('lstat').textContent='Could not load the YouTube player. Check your connection. You can still tap along in another tab.';$('ytwrap').hidden=true};document.head.appendChild(sc)}
+}
+const YT_ERR={2:'That video address is not valid.',5:'The video could not be played in this browser.',100:'That video was not found or is private.',101:'The owner of this video does not allow it to be played in other sites.',150:'The owner of this video does not allow it to be played in other sites.',153:'YouTube refused the player. Open this page from a web address (https or localhost), not from a saved file.'};
+function stopPlayer(){
+  if(yt.player){try{yt.player.destroy()}catch(e){}}
+  yt.player=null;yt.on=false;yt.playing=false;
+  const w=$('ytwrap');if(w){w.hidden=true;w.innerHTML=''}
+  refreshAlign();
+}
+function startPlayer(id){
+  stopPlayer();playing=false;
+  const w=$('ytwrap');w.hidden=false;w.innerHTML='<div id="ytp"></div>';
+  loadYT(()=>{
+    yt.player=new YT.Player('ytp',{videoId:id,width:'100%',height:'100%',playerVars:{playsinline:1,rel:0,modestbranding:1},events:{
+      onReady:()=>{yt.on=true;try{yt.player.setPlaybackRate(S.speed)}catch(e){}
+        $('lstat').textContent='Ready. Press Play, then set the tempo: tap the beat or use "Listen". Press "This is count 1" on a strong first beat.';
+        $('click').disabled=true;$('perc').disabled=true;refreshAlign();refreshPlay();refreshChips()},
+      onStateChange:e=>{yt.playing=e.data===1;playing=yt.playing;refreshPlay()},
+      onError:e=>{yt.on=false;yt.playing=false;playing=false;
+        $('lstat').textContent=(YT_ERR[e.data]||'The video could not be played.')+' You can still use tap-along: open it in a new tab and press "Count 1 now".';
+        refreshAlign();refreshPlay()}}});
+  });
+}
+
+// song list
+const songs=[];
+function saveSongs(){try{localStorage.setItem('bachata-songs',JSON.stringify(songs.filter(s=>s.type==='link').map(({type,title,bpm,site,id,href})=>({type,title,bpm,site,id,href}))))}catch(e){}}
+function renderSongs(){
+  const box=$('songs');box.innerHTML='';
+  if(!songs.length){const d=document.createElement('div');d.className='fine';d.textContent='No songs yet. Add a file or a link above.';box.appendChild(d);return}
+  songs.forEach(sg=>{
+    const b=document.createElement('button');b.type='button';b.className='song'+(sg===curSong?' on':'');
+    const t=document.createElement('span');t.className='t';t.textContent=sg.title;
+    const k=document.createElement('span');k.className='k';k.textContent=(sg.type==='file'?'file':sg.site)+' · '+Math.round(sg.bpm)+' BPM';
+    b.append(t,k);b.onclick=()=>chooseSong(sg);box.appendChild(b);
+  });
+}
+function addSong(sg){
+  const ex=songs.find(x=>x.type==='link'&&sg.type==='link'&&x.id===sg.id);
+  if(ex){ex.title=sg.title;ex.bpm=sg.bpm;renderSongs();saveSongs();return ex}
+  songs.push(sg);renderSongs();saveSongs();return sg;
+}
+function chooseSong(sg){
+  curSong=sg;
+  if(sg.type==='file'){
+    $('src').value='file';setSrc('file');
+    audioEl=sg.audio;S.songBpm=sg.bpm;S.offset=sg.offset;$('fbpm').value=S.songBpm;$('fstat').textContent=sg.fstat;
+    $('pos').max=audioEl.duration||1;
+  }else{$('src').value='link';setSrc('link');selectLink(sg)}
+  renderSongs();
+}
+// keep file-song settings in sync when edited
+setInterval(()=>{if(curSong&&curSong.type==='file'&&S.src==='file'){if(curSong.bpm!==S.songBpm){curSong.bpm=S.songBpm;renderSongs()}curSong.offset=S.offset}},500);
+// per-frame extras
+function tickMusic(){
+  if(S.src==='file'&&audioEl){const t=audioEl.currentTime;if(document.activeElement!==$('pos'))$('pos').value=t;$('ptime').textContent=fmtT(t)+' / '+fmtT(audioEl.duration||0)}
+}
+(function(){try{const raw=localStorage.getItem('bachata-songs');if(raw)JSON.parse(raw).forEach(s=>{if(s&&s.type==='link'&&parseLink(s.href))songs.push(s)})}catch(e){}renderSongs()})();
+
+readColors();onChange();refreshPlay();requestAnimationFrame(frame);
+</script>
