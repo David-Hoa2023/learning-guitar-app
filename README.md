@@ -3,7 +3,7 @@
 A phone app idea that listens to music and turns it into lessons: chords and tabs first, then rhythm, technique, theory, ear training, and a learn-to-dance module.
 
 ## Try the dance trainer
-`index.html` is the Bachata Basic Trainer. Open the GitHub Pages link for this repo on your phone. It plays an 8-count with fixed left and right feet, leader and follower views, counts 1 to 4 and 5 to 8 practice, uploaded audio files, and YouTube videos with tempo from your microphone or by tapping.
+`index.html` is the Bachata Basic Trainer. Open the GitHub Pages link for this repo on your phone. It plays an 8-count with fixed left and right feet, leader and follower views, counts 1 to 4 and 5 to 8 practice, uploaded audio files, and YouTube videos with the tempo, beat positions and a best guess for count 1 found automatically from your microphone ("Listen"), or by tapping.
 
 - YouTube plays through the official embedded player. The page never reads the video's audio.
 - Tempo detection and file analysis run in your browser. Nothing is uploaded.
