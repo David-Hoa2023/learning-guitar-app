@@ -125,7 +125,7 @@ tr.half td{border-top:2px solid var(--line)}
     <div class="panel" id="p-file" hidden>
       <div class="row"><label class="filebtn" for="file">Add an audio file<input id="file" type="file" accept="audio/*"></label></div>
       <div class="fine" id="fstat">Choose a song from your device. It stays on your device and is not uploaded anywhere. The page finds the tempo for you.</div>
-      <div class="row"><label for="fbpm" class="fine">Song BPM</label><input id="fbpm" type="number" min="40" max="240" step="0.1" value="110"><button type="button" id="half">÷2</button><button type="button" id="dbl">×2</button></div>
+      <div class="row"><label for="fbpm" class="fine">Song BPM</label><input id="fbpm" type="number" min="40" max="240" step="0.01" value="110"><button type="button" id="half">÷2</button><button type="button" id="dbl">×2</button></div>
       <div class="row"><input id="pos" type="range" min="0" max="1" step="0.01" value="0" aria-label="Song position"><span class="fine" id="ptime">0:00</span></div>
     </div>
     <div class="panel" id="p-link" hidden>
@@ -133,13 +133,14 @@ tr.half td{border-top:2px solid var(--line)}
       <div class="fine" id="lstat">Paste a YouTube link and the video plays right here. Spotify links cannot play here, so they use tap-along mode: play the song in Spotify, then press "Count 1 now" on its first beat.</div>
       <div id="ytwrap" hidden></div>
       <div class="row"><a id="openLink" class="btnlink" target="_blank" rel="noopener noreferrer" hidden>Open this song in a new tab</a></div>
-      <div class="row"><label for="lbpm" class="fine">Song BPM</label><input id="lbpm" type="number" min="40" max="240" step="0.1" value="110"><button type="button" id="lhalf">÷2</button><button type="button" id="ldbl">×2</button></div>
+      <div class="row"><label for="lbpm" class="fine">Song BPM</label><input id="lbpm" type="number" min="40" max="240" step="0.01" value="110"><button type="button" id="lhalf">÷2</button><button type="button" id="ldbl">×2</button></div>
       <div class="row"><button type="button" id="tapt">Tap tempo</button><span class="fine" id="tapn"></span><button type="button" id="mic">Listen to find tempo</button></div>
       <div class="fine" id="micstat">"Listen" uses your microphone for 15 seconds while the song plays out loud from the speakers (headphones will not work). Or tap along with the beat. If the other player runs at 0.75x, pick the same speed below.</div>
     </div>
     <div class="panel" id="align" hidden>
       <div class="row"><button type="button" id="tap1">This is count 1</button><button type="button" id="shift">Shift 1 beat</button><button type="button" id="nm">−30 ms</button><button type="button" id="np">+30 ms</button></div>
-      <div class="fine">While the song plays, press "This is count 1" on a strong first beat (the bass or bongo accent). Use shift and nudge if the feet feel early or late.</div>
+      <div class="fine">Counting starts when you mark the song's count 1: press "This is count 1" on a strong first beat of an 8-count (the bass or bongo accent). Press it again a few bars later on another count 1 and the page refines the tempo from the time between your two marks. Shift and nudge fix a small early or late feel.</div>
+      <div class="fine" id="alignmsg"></div>
     </div>
   </div>
   <div class="transport">
@@ -179,7 +180,9 @@ tr.half td{border-top:2px solid var(--line)}
 <script>
 const $=id=>document.getElementById(id);
 const cv=$('cv'), cx=cv.getContext('2d');
-const S={mode:'side',role:'lead',section:'all',bpm:82,speed:1,click:true,perc:true,src:'synth',songBpm:110,offset:0,linkBpm:110};
+const S={mode:'side',role:'lead',section:'all',bpm:82,speed:1,click:true,perc:true,src:'synth',songBpm:110,offset:null,linkBpm:110};
+const TAPLAG=0.09; // people tap about 90 ms after they hear a beat
+let anchor=null;   // media time of your last "count 1" mark
 let audioEl=null,curSong=null;
 const yt={player:null,on:false,playing:false};
 const usesMedia=()=>S.src==='file'||(S.src==='link'&&yt.on);
@@ -254,6 +257,7 @@ function setCounter(lit,next){
     litShown=lit;
     const say=$('say');
     if(lit>0){say.innerHTML='<b>'+(info[lit].tap?'TAP':lit)+' · '+info[lit].arrow+cap(info[lit].desc)+'</b><span>Next: '+info[next].arrow+cap(info[next].desc)+'</span>'}
+    else if(playing&&usesMedia()){say.innerHTML='<b>Waiting for the song\'s count 1</b><span>Press "This is count 1" on the first beat of an 8-count, or tap the beat to start the grid.</span>'}
     else{say.innerHTML='<b>Press Play to start on count '+SEQ[S.section][0]+'</b><span>First move: '+cap(info[SEQ[S.section][0]].desc)+'</span>'}
   }
   if(next!==nextShown){for(let n=1;n<=8;n++)cells[n].classList.toggle('next',n===next);nextShown=next}
@@ -351,8 +355,9 @@ function frame(){
   const seq=SEQ[S.section],len=seq.length,base=poses[BASEIDX[S.section]];
   let lit=0,frac=0,nextCount=seq[0],A=base,Lp=base.L,Rp=base.R,wgt=base.w,ghost=null,i=0;
   if(playing){
-    const u=usesMedia()?(audioNow()-S.offset)/mediaBeat():(now()-t0)/beat;
-    if(u>=0||usesMedia()){
+    const am=usesMedia()?audioNow():0; // sample the media clock every frame so the estimate stays tight
+    const u=usesMedia()?(S.offset==null?-1:(am-S.offset)/mediaBeat()):(now()-t0)/beat;
+    if(u>=0){
       const s=Math.floor(u);i=((s%len)+len)%len;lit=seq[i];frac=u-s;
       const ni=(i+1)%len;nextCount=seq[ni];A=poses[lit];wgt=A.w;
       const wrap=S.section!=='all'&&ni===0;
@@ -402,7 +407,7 @@ function onChange(){
   S.mode=$('mode').value;S.role=$('role').value;S.section=$('section').value;S.bpm=+$('bpm').value;S.speed=+$('speed').value;if(audioEl&&playing)audioEl.playbackRate=S.speed;if(yt.on){try{yt.player.setPlaybackRate(S.speed)}catch(e){}}
   refreshChips();
   $('secf').textContent=S.section==='all'?'1 to 8':S.section==='a'?'1 to 4':'5 to 8';
-  litShown=-2;nextShown=-2;
+  litShown=-2;nextShown=-2;anchor=null;
   build();restart();
 }
 ['mode','role','section','bpm','speed'].forEach(id=>$(id).onchange=onChange);
@@ -414,19 +419,27 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change',readColors)
 
 // ---------- music sources
 const refreshChips=()=>{$('effbpm').textContent=Math.round(curBpm()*S.speed)};
-function refreshPlay(){$('play').textContent=playing?'Stop':(S.src==='link'&&!yt.on?'Count 1 now':'Play')}
+function refreshPlay(){litShown=-2;$('play').textContent=playing?'Stop':(S.src==='link'&&!yt.on?'Count 1 now':'Play')}
 function refreshAlign(){$('align').hidden=!usesMedia()}
 const fmtT=t=>Math.floor(t/60)+':'+String(Math.floor(t%60)).padStart(2,'0');
 let lastT=0,lastP=0;
+const clk={c:null,rate:1,p:0};
 function audioNow(){
-  let t,paused,rate;
-  if(S.src==='link'&&yt.on){try{t=yt.player.getCurrentTime()}catch(e){return 0}paused=!yt.playing;rate=S.speed}
-  else if(audioEl){t=audioEl.currentTime;paused=audioEl.paused;rate=audioEl.playbackRate}
+  let raw,paused,rate;
+  if(S.src==='link'&&yt.on){try{raw=yt.player.getCurrentTime()}catch(e){return 0}paused=!yt.playing;rate=S.speed}
+  else if(audioEl){raw=audioEl.currentTime;paused=audioEl.paused;rate=audioEl.playbackRate}
   else return 0;
-  const p=performance.now();
-  if(t!==lastT){lastT=t;lastP=p}
-  if(paused)return t;
-  return t+Math.min(0.12,(p-lastP)/1000*rate);
+  const p=performance.now()/1000;
+  if(paused){clk.c=null;return raw}
+  const d=raw-p*rate;
+  // the reported time only ever lags the real position, so follow the newest report and never step backwards
+  if(clk.c===null||clk.rate!==rate||Math.abs(raw-(p*rate+clk.c))>0.6){clk.c=d;clk.rate=rate;clk.p=p}
+  else{
+    clk.c-=(p-clk.p)*0.0003; // tiny decay so a stale high estimate cannot stick forever
+    if(d>clk.c)clk.c=d;
+  }
+  clk.p=p;
+  return p*rate+clk.c;
 }
 function setSrc(v){
   stop();S.src=v;if(v!=='link')stopPlayer();
@@ -479,17 +492,37 @@ async function handleFile(f){
   if(res){S.songBpm=res.bpm;S.offset=res.offset;st.textContent='"'+f.name+'": found about '+res.bpm+' BPM. Press Play, then press "This is count 1" on a strong first beat. If the tempo looks doubled or halved, use ÷2 or ×2.'}
   else{S.songBpm=110;S.offset=0;st.textContent='"'+f.name+'" loaded, but the tempo could not be found. Type the BPM yourself.'}
   $('fbpm').value=S.songBpm;
+  anchor=null;alignMsg('');
   curSong=addSong({type:'file',title:f.name.replace(/\.[^.]+$/,''),bpm:S.songBpm,offset:S.offset,audio:audioEl,fstat:st.textContent});
   refreshChips();
 }
 $('file').onchange=e=>{const f=e.target.files[0];if(f)handleFile(f)};
-$('fbpm').onchange=e=>{S.songBpm=Math.max(40,Math.min(240,+e.target.value||110));e.target.value=S.songBpm;refreshChips()};
+$('fbpm').onchange=e=>{S.songBpm=Math.max(40,Math.min(240,+e.target.value||110));e.target.value=S.songBpm;anchor=null;refreshChips()};
 $('half').onclick=()=>{S.songBpm=Math.round(S.songBpm/2*10)/10;$('fbpm').value=S.songBpm;refreshChips()};
 $('dbl').onclick=()=>{S.songBpm=Math.round(S.songBpm*2*10)/10;$('fbpm').value=S.songBpm;refreshChips()};
-$('tap1').onclick=()=>{if(!usesMedia()||!playing)return;S.offset=audioNow()-0.1};
-$('shift').onclick=()=>{S.offset+=mediaBeat()};
-$('nm').onclick=()=>{S.offset-=0.03};
-$('np').onclick=()=>{S.offset+=0.03};
+function setMediaBpm(v){
+  v=Math.max(40,Math.min(240,Math.round(v*100)/100));
+  if(S.src==='file'){S.songBpm=v;$('fbpm').value=v}else{S.linkBpm=v;$('lbpm').value=v;if(curSong&&curSong.type==='link'){curSong.bpm=v;saveSongs()}}
+  renderSongs();refreshChips();
+}
+const alignMsg=m=>{$('alignmsg').textContent=m};
+$('tap1').onclick=()=>{
+  if(!usesMedia()||!playing)return;
+  const t=audioNow()-TAPLAG,per=mediaBeat(),len=SEQ[S.section].length;
+  let off=t,note='Count 1 set here.';
+  if(S.offset!=null){const k=Math.round((t-S.offset)/per),snapped=S.offset+k*per;if(Math.abs(snapped-t)<0.35*per)off=snapped}
+  if(anchor!=null){
+    const dt=t-anchor,cyc=len*per,m=Math.round(dt/cyc);
+    if(m>=1&&dt>8&&Math.abs(dt/(m*cyc)-1)<0.04){
+      const newPer=dt/(m*len);setMediaBpm(60/newPer);off=t;
+      note='Count 1 set. Tempo refined to '+(60/newPer).toFixed(2)+' BPM from your two marks.';
+    }
+  }
+  anchor=t;S.offset=off;alignMsg(note+' Press it again a few bars later to refine the tempo.');
+};
+$('shift').onclick=()=>{if(S.offset!=null)S.offset+=mediaBeat()};
+$('nm').onclick=()=>{if(S.offset!=null)S.offset-=0.03};
+$('np').onclick=()=>{if(S.offset!=null)S.offset+=0.03};
 let seeking=false;
 $('pos').oninput=e=>{if(audioEl)audioEl.currentTime=+e.target.value};
 
@@ -508,7 +541,7 @@ function parseLink(u){
   return null;
 }
 function selectLink(song){
-  S.linkBpm=song.bpm;$('lbpm').value=song.bpm;
+  S.offset=null;anchor=null;alignMsg('');S.linkBpm=song.bpm;$('lbpm').value=song.bpm;
   const a=$('openLink');a.href=song.href;a.hidden=false;
   $('lstat').textContent=song.site==='YouTube'?'Loading the YouTube player...':song.site+' link added'+(song.title?' as "'+song.title+'"':'')+'. Spotify cannot play inside this page. Open it in a new tab, set the BPM, press play there, then press "Count 1 now" on its first beat.';
   if(song.site==='YouTube')startPlayer(song.id);else stopPlayer();
@@ -527,15 +560,18 @@ $('tapt').onclick=()=>{
   const media=yt.on&&S.src==='link';
   const t=media?audioNow():performance.now()/1000;
   if(taps.length&&Math.abs(t-taps[taps.length-1])>2)taps=[];
-  taps.push(t);taps=taps.slice(-9);
-  if(taps.length>=3){
-    const iv=[];for(let i=1;i<taps.length;i++)iv.push(taps[i]-taps[i-1]);iv.sort((x,y)=>x-y);
-    let bpm=60/iv[Math.floor(iv.length/2)];while(bpm<70)bpm*=2;while(bpm>180)bpm/=2;
-    S.linkBpm=Math.round(bpm*10)/10;$('lbpm').value=S.linkBpm;
-    if(media)S.offset=t; // beat phase follows your last tap
-    if(curSong&&curSong.type==='link'){curSong.bpm=S.linkBpm;saveSongs();renderSongs()}refreshChips();
-  }
-  $('tapn').textContent=taps.length<3?'keep tapping the beat':taps.length+' taps';
+  taps.push(t);taps=taps.slice(-24);
+  const n=taps.length;
+  if(n>=4){
+    // least-squares line through the taps: slope is the beat length, so tap jitter averages out
+    let kb=(n-1)/2,tb=taps.reduce((x,y)=>x+y,0)/n,num=0,den=0;
+    taps.forEach((v,k)=>{num+=(k-kb)*(v-tb);den+=(k-kb)*(k-kb)});
+    const slope=num/den;
+    let bpm=60/slope;while(bpm<70)bpm*=2;while(bpm>180)bpm/=2;
+    setMediaBpm(bpm);
+    if(media){S.offset=tb-slope*kb-TAPLAG;anchor=null}
+    $('tapn').textContent=n+' taps';
+  }else $('tapn').textContent=n<4?'keep tapping the beat':'';
 };
 $('lhalf').onclick=()=>{S.linkBpm=Math.round(S.linkBpm/2*10)/10;$('lbpm').value=S.linkBpm;refreshChips()};
 $('ldbl').onclick=()=>{S.linkBpm=Math.round(S.linkBpm*2*10)/10;$('lbpm').value=S.linkBpm;refreshChips()};
@@ -619,7 +655,7 @@ function chooseSong(sg){
   curSong=sg;
   if(sg.type==='file'){
     $('src').value='file';setSrc('file');
-    audioEl=sg.audio;S.songBpm=sg.bpm;S.offset=sg.offset;$('fbpm').value=S.songBpm;$('fstat').textContent=sg.fstat;
+    anchor=null;audioEl=sg.audio;S.songBpm=sg.bpm;S.offset=sg.offset;$('fbpm').value=S.songBpm;$('fstat').textContent=sg.fstat;
     $('pos').max=audioEl.duration||1;
   }else{$('src').value='link';setSrc('link');selectLink(sg)}
   renderSongs();

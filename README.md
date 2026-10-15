@@ -8,6 +8,7 @@ A phone app idea that listens to music and turns it into lessons: chords and tab
 - YouTube plays through the official embedded player. The page never reads the video's audio.
 - Tempo detection and file analysis run in your browser. Nothing is uploaded.
 - Spotify links cannot play inside the page and use tap-along mode.
+- Counting starts only after you mark the song's count 1 (or tap the beat). Mark count 1 again a few bars later and the tempo is refined from the time between your two marks.
 
 ## Contents
 - `index.html`: the dance trainer (one file, no build step)
